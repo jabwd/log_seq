@@ -5,21 +5,22 @@ pub struct Seq {
     default_level: LevelFilter,
     ingest_url: String,
     api_key: String,
-    application: String
+    application: String,
+    module: String
 }
 
 impl Seq {
-    pub fn new(api_key: &str, ingest_url: &str, application: &str) -> Self {
+    pub fn new(api_key: &str, ingest_url: &str, application: &str, module: &str) -> Self {
         Seq {
-            default_level: LevelFilter::Trace,
+            default_level: LevelFilter::Info,
             ingest_url: ingest_url.to_string(),
             api_key: api_key.to_string(),
-            application: application.to_string()
+            application: application.to_string(),
+            module: module.to_string(),
         }
     }
 
     pub fn init(self) {
-        println!("Setting logger");
         log::set_max_level(self.default_level);
         log::set_boxed_logger(Box::new(self)).expect("Unable to set seq as a logger");
     }
@@ -42,7 +43,6 @@ impl Log for Seq {
 
     fn log(&self, record: &Record) {
         if !self.enabled(record.metadata()) {
-            println!("Not enabled?");
             return;
         }
 
@@ -50,11 +50,14 @@ impl Log for Seq {
         if record.module_path().unwrap_or("").contains("ureq") {
             return;
         }
+        if !record.module_path().unwrap_or("").contains(self.module.as_str()) && !(record.metadata().level().to_level_filter() <= LevelFilter::Warn) {
+            return;
+        }
 
         let msgs = format!(
             "{{\"@t\": \"{}\", \"@mt\": \"{}\", \"@l\": \"{}\", \"Application\": \"{}\", \"line\": \"{}\", \"module\": \"{}\", \"file\": \"{}\"}}",
             Utc::now().format("%+"),
-            record.args(),
+            record.args().to_string().replace("\"", ""),
             Seq::level_to_seq_level(&record.level()),
             self.application,
             record.line().unwrap_or(0),
@@ -84,7 +87,7 @@ mod test {
 
     #[test]
     fn basics() {
-        Seq::new("", "", "log_seq test").init();
+        Seq::new("", "", "log_seq test", "log_seq").init();
         log::warn!("test test");
         log::error!("Testing an error code");
     }
