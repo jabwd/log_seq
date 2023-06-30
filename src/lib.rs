@@ -54,6 +54,8 @@ impl Log for Seq {
             return;
         }
 
+        println!("{}", record.args().to_string().replace("\"", ""));
+
         let msgs = format!(
             "{{\"@t\": \"{}\", \"@mt\": \"{}\", \"@l\": \"{}\", \"Application\": \"{}\", \"line\": \"{}\", \"module\": \"{}\", \"file\": \"{}\"}}",
             Utc::now().format("%+"),
