@@ -34,6 +34,17 @@ impl Seq {
             Level::Error => String::from("Error"),
         }
     }
+
+    fn debug_print(record: &Record) {
+        let prefix = match record.level() {
+            Level::Trace => "[ TRACE ]",
+            Level::Debug => "[ DEBUG ]",
+            Level::Info => "[ INFO ]",
+            Level::Warn => "[ WARN ]",
+            Level::Error => "[ ERROR ]"
+        };
+        println!("{} {}", prefix, record.args().to_string().replace("\"", ""));
+    }
 }
 
 impl Log for Seq {
@@ -54,7 +65,7 @@ impl Log for Seq {
             return;
         }
 
-        println!("{}", record.args().to_string().replace("\"", ""));
+        Seq::debug_print(&record);
 
         let msgs = format!(
             "{{\"@t\": \"{}\", \"@mt\": \"{}\", \"@l\": \"{}\", \"Application\": \"{}\", \"line\": \"{}\", \"module\": \"{}\", \"file\": \"{}\"}}",
