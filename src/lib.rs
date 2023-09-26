@@ -57,10 +57,6 @@ impl Log for Seq {
             return;
         }
 
-        // Ugly workaround for ureq causing an infinite loop if the user would use trace as a level
-        // if record.module_path().unwrap_or("").contains("ureq") {
-        //     return;
-        // }
         if !record.module_path().unwrap_or("").contains(self.module.as_str()) && !(record.metadata().level().to_level_filter() <= LevelFilter::Warn) {
             return;
         }

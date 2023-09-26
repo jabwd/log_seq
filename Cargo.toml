@@ -7,3 +7,11 @@ edition = "2021"
 log = { version = "0.4.0", features = ["std"] }
 ureq = { version = "2.6" }
 chrono = "0.4.24"
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+[dependencies.tokio]
+version = "1.0"
+features = ["macros", "rt-multi-thread", "time"]
+
+[profile.release]
+strip = true
