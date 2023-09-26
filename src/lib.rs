@@ -1,3 +1,5 @@
+use std::sync::Arc;
+use std::sync::Mutex;
 use chrono::Utc;
 use log::{LevelFilter, Level, Log, Metadata, Record};
 
@@ -6,7 +8,28 @@ pub struct Seq {
     ingest_url: String,
     api_key: String,
     application: String,
-    module: String
+    module: String,
+    buffer: LogBuffer,
+}
+
+pub struct LogBuffer {
+    pub buff: Arc<Mutex<Vec<String>>>,
+}
+
+impl LogBuffer {
+    fn new() -> Self {
+        LogBuffer {
+            buff: Arc::new(Mutex::new(vec![])),
+        }
+    }
+}
+
+impl Clone for LogBuffer {
+    fn clone(&self) -> Self {
+        LogBuffer {
+            buff: Arc::clone(&self.buff),
+        }
+    }
 }
 
 impl Seq {
@@ -17,6 +40,7 @@ impl Seq {
             api_key: api_key.to_string(),
             application: application.to_string(),
             module: module.to_string(),
+            buffer: LogBuffer::new(),
         }
     }
 
@@ -73,20 +97,33 @@ impl Log for Seq {
             record.module_path().unwrap_or(""),
             record.file().unwrap_or("")
         );
+        let mut buff = self.buffer.buff.lock().unwrap();
+        buff.push(msgs);
+    }
+
+    fn flush(&self) {
+        let messages = {
+            let mut msgs = self.buffer.buff.lock().unwrap();
+            let mut buff = String::new();
+            println!("Sending: {} log messages", msgs.len());
+            for msg in msgs.iter() {
+                buff += format!("{}\n", msg).as_str();
+            }
+            msgs.clear();
+
+            buff
+        };
+
         let ingest_url = format!("{}/api/events/raw?clef", self.ingest_url);
         match ureq::post(ingest_url.as_str())
             .set("X-Seq-ApiKey", &self.api_key)
             .set("Content-Type", "application/vnd.serilog.clef")
-            .send_string(msgs.as_str()) {
+            .send_string(messages.as_str()) {
             Ok(_) => {},
             Err(why) => {
                 eprintln!("Updating seq logs failed: {:?}", why);
             }
         }
-    }
-
-    fn flush(&self) {
-
     }
 }
 
