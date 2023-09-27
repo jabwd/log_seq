@@ -97,33 +97,44 @@ impl Log for Seq {
             record.module_path().unwrap_or(""),
             record.file().unwrap_or("")
         );
-        let mut buff = self.buffer.buff.lock().unwrap();
-        buff.push(msgs);
-    }
-
-    fn flush(&self) {
-        let messages = {
-            let mut msgs = self.buffer.buff.lock().unwrap();
-            let mut buff = String::new();
-            println!("Sending: {} log messages", msgs.len());
-            for msg in msgs.iter() {
-                buff += format!("{}\n", msg).as_str();
-            }
-            msgs.clear();
-
-            buff
-        };
+        // let mut buff = self.buffer.buff.lock().unwrap();
+        // buff.push(msgs);
 
         let ingest_url = format!("{}/api/events/raw?clef", self.ingest_url);
         match ureq::post(ingest_url.as_str())
             .set("X-Seq-ApiKey", &self.api_key)
             .set("Content-Type", "application/vnd.serilog.clef")
-            .send_string(messages.as_str()) {
+            .send_string(msgs.as_str()) {
             Ok(_) => {},
             Err(why) => {
                 eprintln!("Updating seq logs failed: {:?}", why);
             }
         }
+    }
+
+    fn flush(&self) {
+        // let messages = {
+        //     let mut msgs = self.buffer.buff.lock().unwrap();
+        //     let mut buff = String::new();
+        //     println!("Sending: {} log messages", msgs.len());
+        //     for msg in msgs.iter() {
+        //         buff += format!("{}\n", msg).as_str();
+        //     }
+        //     msgs.clear();
+
+        //     buff
+        // };
+
+        // let ingest_url = format!("{}/api/events/raw?clef", self.ingest_url);
+        // match ureq::post(ingest_url.as_str())
+        //     .set("X-Seq-ApiKey", &self.api_key)
+        //     .set("Content-Type", "application/vnd.serilog.clef")
+        //     .send_string(messages.as_str()) {
+        //     Ok(_) => {},
+        //     Err(why) => {
+        //         eprintln!("Updating seq logs failed: {:?}", why);
+        //     }
+        // }
     }
 }
 
