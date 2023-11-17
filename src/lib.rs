@@ -1,5 +1,3 @@
-use std::sync::Arc;
-use std::sync::Mutex;
 use chrono::Utc;
 use log::{LevelFilter, Level, Log, Metadata, Record};
 
@@ -9,27 +7,6 @@ pub struct Seq {
     api_key: String,
     application: String,
     module: String,
-    buffer: LogBuffer,
-}
-
-pub struct LogBuffer {
-    pub buff: Arc<Mutex<Vec<String>>>,
-}
-
-impl LogBuffer {
-    fn new() -> Self {
-        LogBuffer {
-            buff: Arc::new(Mutex::new(vec![])),
-        }
-    }
-}
-
-impl Clone for LogBuffer {
-    fn clone(&self) -> Self {
-        LogBuffer {
-            buff: Arc::clone(&self.buff),
-        }
-    }
 }
 
 impl Seq {
@@ -40,7 +17,6 @@ impl Seq {
             api_key: api_key.to_string(),
             application: application.to_string(),
             module: module.to_string(),
-            buffer: LogBuffer::new(),
         }
     }
 
@@ -81,7 +57,8 @@ impl Log for Seq {
             return;
         }
 
-        if !record.module_path().unwrap_or("").contains(self.module.as_str()) && !(record.metadata().level().to_level_filter() <= LevelFilter::Warn) {
+        if !record.module_path().unwrap_or("").contains(self.module.as_str()) && 
+            !(record.metadata().level().to_level_filter() <= LevelFilter::Warn) {
             return;
         }
 
@@ -97,51 +74,20 @@ impl Log for Seq {
             record.module_path().unwrap_or(""),
             record.file().unwrap_or("")
         );
-        let mut buff = self.buffer.buff.lock().unwrap();
-        buff.push(msgs);
-        if buff.len() > 15 {
-            println!("Log buffer exceeding message count, flushing");
-            self.flush();
-        }
-
-        // let ingest_url = format!("{}/api/events/raw?clef", self.ingest_url);
-        // match ureq::post(ingest_url.as_str())
-        //     .set("X-Seq-ApiKey", &self.api_key)
-        //     .set("Content-Type", "application/vnd.serilog.clef")
-        //     .send_string(msgs.as_str()) {
-        //     Ok(_) => {},
-        //     Err(why) => {
-        //         eprintln!("Updating seq logs failed: {:?}", why);
-        //     }
-        // }
-    }
-
-    fn flush(&self) {
-        let messages = {
-            let mut msgs = self.buffer.buff.lock().unwrap();
-            if msgs.len() == 0 {
-                return;
-            }
-            let mut buff = String::new();
-            println!("Sending: {} log messages", msgs.len());
-            for msg in msgs.iter() {
-                buff += format!("{}\n", msg).as_str();
-            }
-            msgs.clear();
-
-            buff
-        };
 
         let ingest_url = format!("{}/api/events/raw?clef", self.ingest_url);
         match ureq::post(ingest_url.as_str())
             .set("X-Seq-ApiKey", &self.api_key)
             .set("Content-Type", "application/vnd.serilog.clef")
-            .send_string(messages.as_str()) {
+            .send_string(msgs.as_str()) {
             Ok(_) => {},
             Err(why) => {
                 eprintln!("Updating seq logs failed: {:?}", why);
             }
         }
+    }
+
+    fn flush(&self) {
     }
 }
 
