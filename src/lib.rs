@@ -67,7 +67,7 @@ impl Log for Seq {
         let msgs = format!(
             "{{\"@t\": \"{}\", \"@mt\": \"{}\", \"@l\": \"{}\", \"Application\": \"{}\", \"line\": \"{}\", \"module\": \"{}\", \"file\": \"{}\"}}",
             Utc::now().format("%+"),
-            record.args().to_string().replace("\"", ""),
+            record.args().to_string().replace("\"", "").replace("\n", "\\n"),
             Seq::level_to_seq_level(&record.level()),
             self.application,
             record.line().unwrap_or(0),
@@ -82,6 +82,7 @@ impl Log for Seq {
             .send_string(msgs.as_str()) {
             Ok(_) => {},
             Err(why) => {
+                eprintln!("Seq msg attempt: {}", msgs);
                 eprintln!("Updating seq logs failed: {:?}", why);
             }
         }
