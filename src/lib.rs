@@ -1,5 +1,6 @@
 use chrono::Utc;
-use log::{LevelFilter, Level, Log, Metadata, Record};
+use log::{Level, LevelFilter, Log, Metadata, Record};
+use serde::Serialize;
 
 pub struct Seq {
     default_level: LevelFilter,
@@ -41,9 +42,41 @@ impl Seq {
             Level::Debug => "[ DEBUG ]",
             Level::Info => "[ INFO ]",
             Level::Warn => "[ WARN ]",
-            Level::Error => "[ ERROR ]"
+            Level::Error => "[ ERROR ]",
         };
         println!("{} {}", prefix, record.args().to_string().replace("\"", ""));
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SeqMessage {
+    #[serde(rename = "@t")]
+    timestamp: String,
+    #[serde(rename = "@mt")]
+    message: String,
+    #[serde(rename = "Application")]
+    application: String,
+    #[serde(rename = "Line")]
+    line: u32,
+    #[serde(rename = "@l")]
+    level: String,
+    #[serde(rename = "Module")]
+    module: String,
+    #[serde(rename = "File")]
+    file: String,
+}
+
+impl SeqMessage {
+    fn from_record(seq: &Seq, record: &Record) -> Self {
+        SeqMessage {
+            timestamp: Utc::now().format("%+").to_string(),
+            message: record.args().to_string(),
+            application: seq.application.clone(),
+            line: record.line().unwrap_or(0),
+            level: Seq::level_to_seq_level(&record.level()),
+            module: record.module_path().unwrap_or("").to_string(),
+            file: record.file().unwrap_or("").to_string(),
+        }
     }
 }
 
@@ -57,39 +90,40 @@ impl Log for Seq {
             return;
         }
 
-        if !record.module_path().unwrap_or("").contains(self.module.as_str()) && 
-            !(record.metadata().level().to_level_filter() <= LevelFilter::Warn) {
+        if !record
+            .module_path()
+            .unwrap_or("")
+            .contains(self.module.as_str())
+            && !(record.metadata().level().to_level_filter() <= LevelFilter::Warn)
+        {
             return;
         }
 
         Seq::debug_print(&record);
-
-        let msgs = format!(
-            "{{\"@t\": \"{}\", \"@mt\": \"{}\", \"@l\": \"{}\", \"Application\": \"{}\", \"line\": \"{}\", \"module\": \"{}\", \"file\": \"{}\"}}",
-            Utc::now().format("%+"),
-            record.args().to_string().replace("\"", "").replace("\n", "\\n"),
-            Seq::level_to_seq_level(&record.level()),
-            self.application,
-            record.line().unwrap_or(0),
-            record.module_path().unwrap_or(""),
-            record.file().unwrap_or("")
-        );
+        let msg = SeqMessage::from_record(self, &record);
+        let msg = match serde_json::to_string(&msg) {
+            Ok(s) => s,
+            Err(why) => {
+                eprintln!("Unable to generate seq message: {:#?}", why);
+                return;
+            }
+        };
 
         let ingest_url = format!("{}/api/events/raw?clef", self.ingest_url);
         match ureq::post(ingest_url.as_str())
             .set("X-Seq-ApiKey", &self.api_key)
             .set("Content-Type", "application/vnd.serilog.clef")
-            .send_string(msgs.as_str()) {
-            Ok(_) => {},
+            .send_string(msg.as_str())
+        {
+            Ok(_) => {}
             Err(why) => {
-                eprintln!("Seq msg attempt: {}", msgs);
+                eprintln!("Seq msg attempt: {:#?}", msg);
                 eprintln!("Updating seq logs failed: {:?}", why);
             }
         }
     }
 
-    fn flush(&self) {
-    }
+    fn flush(&self) {}
 }
 
 #[cfg(test)]
