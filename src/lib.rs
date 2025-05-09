@@ -75,7 +75,7 @@ impl SeqMessage {
         format!(
             "{{\"@t\": \"{}\", \"@mt\": \"{}\", \"Application\": \"{}\", \"Line\": \"{}\", \"@l\": \"{}\", \"Module\": \"{}\", \"file\": \"{}\"}}",
             self.timestamp,
-            self.message,
+            self.message.replace("\"", "\\\"").replace("\n", "\\n"),
             self.application,
             self.line,
             self.level,
@@ -116,6 +116,7 @@ impl Log for Seq {
             Ok(_) => {}
             Err(why) => {
                 eprintln!("Seq msg attempt: {:#?}", msg);
+                eprintln!("Rendered message: {}", msg.as_clef());
                 eprintln!("Updating seq logs failed: {:?}", why);
             }
         }
