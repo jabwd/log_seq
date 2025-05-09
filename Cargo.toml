@@ -1,19 +1,12 @@
 [package]
 name = "log_seq"
-version = "0.2.0"
-edition = "2021"
+version = "0.3.0"
+edition = "2024"
 
 [dependencies]
-log = { version = "0.4.0", features = ["std"] }
-ureq = { version = "2.6" }
-chrono = "0.4.24"
-serde = "1.0"
-serde_json = "1.0"
-# reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
-
-# [dependencies.tokio]
-# version = "1.0"
-# features = ["macros", "rt-multi-thread", "time"]
+log = { version = "0.4", features = ["std"] }
+ureq = "3.0"
+chrono = "0.4"
 
 [profile.release]
 strip = true

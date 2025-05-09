@@ -1,6 +1,5 @@
 use chrono::Utc;
 use log::{Level, LevelFilter, Log, Metadata, Record};
-use serde::Serialize;
 
 pub struct Seq {
     default_level: LevelFilter,
@@ -48,21 +47,14 @@ impl Seq {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 struct SeqMessage {
-    #[serde(rename = "@t")]
     timestamp: String,
-    #[serde(rename = "@mt")]
     message: String,
-    #[serde(rename = "Application")]
     application: String,
-    #[serde(rename = "Line")]
     line: u32,
-    #[serde(rename = "@l")]
     level: String,
-    #[serde(rename = "Module")]
     module: String,
-    #[serde(rename = "File")]
     file: String,
 }
 
@@ -77,6 +69,19 @@ impl SeqMessage {
             module: record.module_path().unwrap_or("").to_string(),
             file: record.file().unwrap_or("").to_string(),
         }
+    }
+
+    fn as_clef(&self) -> String {
+        format!(
+            "{{\"@t\": \"{}\", \"@mt\": \"{}\", \"Application\": \"{}\", \"Line\": \"{}\", \"@l\": \"{}\", \"Module\": \"{}\", \"file\": \"{}\"}}",
+            self.timestamp,
+            self.message,
+            self.application,
+            self.line,
+            self.level,
+            self.module,
+            self.file
+        )
     }
 }
 
@@ -101,19 +106,12 @@ impl Log for Seq {
 
         Seq::debug_print(&record);
         let msg = SeqMessage::from_record(self, &record);
-        let msg = match serde_json::to_string(&msg) {
-            Ok(s) => s,
-            Err(why) => {
-                eprintln!("Unable to generate seq message: {:#?}", why);
-                return;
-            }
-        };
 
         let ingest_url = format!("{}/api/events/raw?clef", self.ingest_url);
         match ureq::post(ingest_url.as_str())
-            .set("X-Seq-ApiKey", &self.api_key)
-            .set("Content-Type", "application/vnd.serilog.clef")
-            .send_string(msg.as_str())
+            .header("X-Seq-ApiKey", &self.api_key)
+            .header("Content-Type", "application/vnd.serilog.clef")
+            .send(msg.as_clef())
         {
             Ok(_) => {}
             Err(why) => {
