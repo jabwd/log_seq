@@ -1,6 +1,8 @@
 use chrono::Utc;
 use log::{Level, LevelFilter, Log, Metadata, Record};
 
+pub struct Message {}
+
 pub struct Seq {
     default_level: LevelFilter,
     ingest_url: String,
@@ -47,14 +49,21 @@ impl Seq {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 struct SeqMessage {
+    #[serde(rename(serialize = "@t"))]
     timestamp: String,
+    #[serde(rename(serialize = "@mt"))]
     message: String,
+    #[serde(rename(serialize = "Application"))]
     application: String,
+    #[serde(rename(serialize = "Line"))]
     line: u32,
+    #[serde(rename(serialize = "@l"))]
     level: String,
+    #[serde(rename(serialize = "Module"))]
     module: String,
+    #[serde(rename(serialize = "file"))]
     file: String,
 }
 
@@ -71,17 +80,23 @@ impl SeqMessage {
         }
     }
 
+    /// Generates the weird json format that
+    /// seq expects. Attempts to build a custom error
+    /// if the serde_json encoding fails so always returns a string!
     fn as_clef(&self) -> String {
-        format!(
-            "{{\"@t\": \"{}\", \"@mt\": \"{}\", \"Application\": \"{}\", \"Line\": \"{}\", \"@l\": \"{}\", \"Module\": \"{}\", \"file\": \"{}\"}}",
-            self.timestamp,
-            self.message.replace("\"", "\\\"").replace("\n", "\\n"),
-            self.application,
-            self.line,
-            self.level,
-            self.module,
-            self.file
-        )
+        match serde_json::to_string(&self) {
+            Ok(str) => str,
+            Err(why) => {
+                // As a fallback lets try to create a crappy response,
+                // though I don't expect to work very well given how
+                // funky this replace could be in reality.
+                let str = why.to_string().replace("\\", "");
+                format!(
+                    r#"{{"@t": "{}", "@mt": "encode fail: {}", "Application": "Bamboot", "Line": "99", "@l": "Error", "Module": "log_seq", "file": "log_seq.rs"}}"#,
+                    self.timestamp, str
+                )
+            }
+        }
     }
 }
 
